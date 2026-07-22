@@ -1,0 +1,88 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "MCW CurseForge Gateway",
+    "version": "0.1.0",
+    "description": "Minecraft-only metadata gateway used by MCW Launcher. The CurseForge API key remains server-side."
+  },
+  "servers": [
+    { "url": "https://your-project.vercel.app" }
+  ],
+  "paths": {
+    "/api/health": {
+      "get": { "summary": "Check gateway configuration", "responses": { "200": { "description": "Configured" }, "503": { "description": "Missing API key" } } }
+    },
+    "/api/curseforge/search": {
+      "get": {
+        "summary": "Search Minecraft CurseForge projects",
+        "parameters": [
+          { "name": "query", "in": "query", "required": true, "schema": { "type": "string", "maxLength": 100 } },
+          { "name": "gameVersion", "in": "query", "schema": { "type": "string" } },
+          { "name": "loader", "in": "query", "schema": { "type": "string", "enum": ["any", "forge", "fabric", "quilt", "neoforge"] } },
+          { "name": "classId", "in": "query", "schema": { "type": "integer", "default": 6 } },
+          { "name": "index", "in": "query", "schema": { "type": "integer", "minimum": 0, "default": 0 } },
+          { "name": "pageSize", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 50, "default": 20 } }
+        ],
+        "responses": { "200": { "description": "CurseForge search response" }, "400": { "description": "Invalid parameters" } }
+      }
+    },
+    "/api/curseforge/mod": {
+      "get": {
+        "summary": "Get one project",
+        "parameters": [{ "name": "modId", "in": "query", "required": true, "schema": { "type": "integer", "minimum": 1 } }],
+        "responses": { "200": { "description": "CurseForge mod response" } }
+      }
+    },
+    "/api/curseforge/files": {
+      "get": {
+        "summary": "List files belonging to a project",
+        "parameters": [
+          { "name": "modId", "in": "query", "required": true, "schema": { "type": "integer", "minimum": 1 } },
+          { "name": "gameVersion", "in": "query", "schema": { "type": "string" } },
+          { "name": "loader", "in": "query", "schema": { "type": "string", "enum": ["any", "forge", "fabric", "quilt", "neoforge"] } }
+        ],
+        "responses": { "200": { "description": "CurseForge files response" } }
+      }
+    },
+    "/api/curseforge/file": {
+      "get": {
+        "summary": "Get one file",
+        "parameters": [
+          { "name": "modId", "in": "query", "required": true, "schema": { "type": "integer", "minimum": 1 } },
+          { "name": "fileId", "in": "query", "required": true, "schema": { "type": "integer", "minimum": 1 } }
+        ],
+        "responses": { "200": { "description": "CurseForge file response" } }
+      }
+    },
+    "/api/curseforge/download-url": {
+      "get": {
+        "summary": "Resolve a direct CurseForge download URL",
+        "parameters": [
+          { "name": "modId", "in": "query", "required": true, "schema": { "type": "integer", "minimum": 1 } },
+          { "name": "fileId", "in": "query", "required": true, "schema": { "type": "integer", "minimum": 1 } }
+        ],
+        "responses": { "200": { "description": "String response containing the URL" }, "404": { "description": "URL unavailable" } }
+      }
+    },
+    "/api/curseforge/files/batch": {
+      "post": {
+        "summary": "Get up to 50 files",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object", "required": ["fileIds"], "properties": { "fileIds": { "type": "array", "minItems": 1, "maxItems": 50, "items": { "type": "integer", "minimum": 1 } } } } } }
+        },
+        "responses": { "200": { "description": "CurseForge batch file response" } }
+      }
+    },
+    "/api/curseforge/mods/batch": {
+      "post": {
+        "summary": "Get up to 50 projects",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object", "required": ["modIds"], "properties": { "modIds": { "type": "array", "minItems": 1, "maxItems": 50, "items": { "type": "integer", "minimum": 1 } } } } } }
+        },
+        "responses": { "200": { "description": "CurseForge batch mod response" } }
+      }
+    }
+  }
+}

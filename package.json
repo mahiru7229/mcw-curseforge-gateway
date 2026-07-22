@@ -1,0 +1,16 @@
+{
+  "name": "mcw-curseforge-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A minimal Vercel gateway that keeps the CurseForge API key outside MCW Launcher.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "npx vercel dev",
+    "test": "node --test",
+    "check": "node scripts/check-syntax.mjs && npm test",
+    "deploy": "npx vercel --prod"
+  }
+}
