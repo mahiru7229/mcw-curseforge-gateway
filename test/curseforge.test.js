@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { curseForgeRequest } from "../lib/curseforge.js";
+import { CurseForgeUpstreamError } from "../lib/errors.js";
+
 test("curseForgeRequest adds the secret header without exposing it in the URL", async () => {
     process.env.CURSEFORGE_API_KEY = "server-secret";
     process.env.CURSEFORGE_API_BASE_URL = "https://api.example.test/v1";
@@ -10,20 +12,39 @@ test("curseForgeRequest adds the secret header without exposing it in the URL", 
     globalThis.fetch = async (input, init) => {
         capturedUrl = String(input);
         capturedHeaders = new Headers(init?.headers);
-        return new Response(JSON.stringify({ data: [] }), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-        });
+        return new Response(JSON.stringify({ data: [] }), { status: 200, headers: { "Content-Type": "application/json" } });
     };
     try {
-        const result = await curseForgeRequest("/mods/search", {
-            query: new URLSearchParams({ gameId: "432" }),
-            requestId: "request-1",
-        });
+        const result = await curseForgeRequest("/mods/search", { query: new URLSearchParams({ gameId: "432" }), requestId: "request-1" });
         assert.deepEqual(result, { data: [] });
         assert.equal(capturedHeaders.get("x-api-key"), "server-secret");
         assert.equal(new URL(capturedUrl).searchParams.get("x-api-key"), null);
         assert.equal(new URL(capturedUrl).searchParams.get("gameId"), "432");
+    }
+    finally {
+        globalThis.fetch = originalFetch;
+        delete process.env.CURSEFORGE_API_KEY;
+        delete process.env.CURSEFORGE_API_BASE_URL;
+    }
+});
+
+test("curseForgeRequest preserves safe upstream diagnostics for error classification", async () => {
+    process.env.CURSEFORGE_API_KEY = "server-secret";
+    process.env.CURSEFORGE_API_BASE_URL = "https://api.example.test/v1";
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => new Response("File distribution is disabled", { status: 403 });
+    try {
+        await assert.rejects(
+            curseForgeRequest("/mods/10/files/20/download-url", { requestId: "request-2" }),
+            (error) => {
+                assert.ok(error instanceof CurseForgeUpstreamError);
+                assert.equal(error.upstreamStatus, 403);
+                assert.equal(error.path, "/mods/10/files/20/download-url");
+                assert.match(error.responsePreview, /distribution/i);
+                assert.doesNotMatch(error.responsePreview, /server-secret/);
+                return true;
+            },
+        );
     }
     finally {
         globalThis.fetch = originalFetch;
