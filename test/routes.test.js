@@ -4,11 +4,15 @@ import test from "node:test";
 import { GET as downloadUrl } from "../api/curseforge/download-url.js";
 import { GET as search } from "../api/curseforge/search.js";
 import { GET as health } from "../api/health.js";
+import { resetRateLimitForTests } from "../lib/rate-limit.js";
 
 function restoreEnvironment(originalFetch) {
   globalThis.fetch = originalFetch;
   delete process.env.CURSEFORGE_API_KEY;
   delete process.env.CURSEFORGE_API_BASE_URL;
+  delete process.env.MCW_RATE_LIMIT_REQUESTS;
+  delete process.env.MCW_RATE_LIMIT_GLOBAL_REQUESTS;
+  resetRateLimitForTests();
 }
 
 test("health reports a missing CurseForge key without exposing details", async () => {
@@ -165,6 +169,40 @@ test("a generic forbidden response is not mislabeled as missing credentials", as
     const body = await response.json();
     assert.equal(response.status, 403);
     assert.equal(body.error.code, "upstream_forbidden");
+  } finally {
+    restoreEnvironment(originalFetch);
+  }
+});
+
+test("a route returns rate-limit headers and blocks before another upstream request", async () => {
+  process.env.CURSEFORGE_API_KEY = "secret";
+  process.env.CURSEFORGE_API_BASE_URL = "https://curseforge.test/v1";
+  process.env.MCW_RATE_LIMIT_REQUESTS = "1";
+  process.env.MCW_RATE_LIMIT_GLOBAL_REQUESTS = "10";
+  resetRateLimitForTests();
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls += 1;
+    return new Response(JSON.stringify({ data: [], pagination: {} }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  };
+  try {
+    const request = () => new Request(
+      "https://gateway.test/api/curseforge/search?query=sodium&gameVersion=1.21.1&loader=fabric",
+      { headers: { "X-Vercel-Forwarded-For": "203.0.113.99" } },
+    );
+    const allowed = await search(request());
+    const blocked = await search(request());
+    const body = await blocked.json();
+    assert.equal(allowed.status, 200);
+    assert.equal(allowed.headers.get("x-ratelimit-remaining"), "0");
+    assert.equal(blocked.status, 429);
+    assert.equal(body.error.code, "rate_limited");
+    assert.ok(Number(blocked.headers.get("retry-after")) >= 1);
+    assert.equal(calls, 1);
   } finally {
     restoreEnvironment(originalFetch);
   }

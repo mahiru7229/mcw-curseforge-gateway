@@ -45,3 +45,16 @@ The client token is only an abuse-deterrence measure. It is not a true secret af
 6. If no URL is available, open the official project page and use the manual-file flow.
 
 Do not proxy `.jar` or `.mcwpack` bytes through Vercel.
+
+## Rate-limit handling
+
+Protected responses include `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset`.
+
+When the gateway returns HTTP `429`:
+
+1. Read `Retry-After` as seconds.
+2. Pause that provider until the delay expires.
+3. Reuse the existing resolve/install plan instead of starting resolution again.
+4. Do not retry concurrently from several launcher tasks.
+
+HTTP `503` with `error.code == "rate_limit_unavailable"` means the distributed protection store is unavailable. Treat it as a temporary provider outage and preserve the local cache.

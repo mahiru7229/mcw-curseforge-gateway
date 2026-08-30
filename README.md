@@ -10,6 +10,8 @@ A small Vercel Functions gateway for MCW Launcher. It keeps the CurseForge `x-ap
 - Download URL resolution.
 - Input validation, timeout handling and sanitized errors.
 - Optional lightweight MCW client token.
+- Sliding-window limits per client and for the whole gateway.
+- Distributed Vercel rate limiting through Upstash Redis, with a development fallback.
 - Vercel CDN caching for safe GET metadata routes.
 - Never proxies mod binaries through Vercel.
 
@@ -43,6 +45,9 @@ Edit `.env.local`:
 CURSEFORGE_API_KEY=your_real_key
 MCW_CLIENT_TOKEN=
 MCW_ALLOWED_ORIGIN=*
+MCW_RATE_LIMIT_REQUESTS=60
+MCW_RATE_LIMIT_GLOBAL_REQUESTS=600
+MCW_RATE_LIMIT_WINDOW_SECONDS=60
 ```
 
 Run:
@@ -72,7 +77,34 @@ vercel --prod
 
 Or import the GitHub repository from the Vercel dashboard, then add `CURSEFORGE_API_KEY` under **Project → Settings → Environment Variables** and redeploy.
 
-Recommended Vercel Firewall rule for this small project:
+## Distributed rate limiting on Vercel
+
+Rate limiting is enabled by default. For production, connect an Upstash Redis database from the Vercel Marketplace to this project. Vercel injects these variables automatically:
+
+```text
+UPSTASH_REDIS_REST_URL
+UPSTASH_REDIS_REST_TOKEN
+```
+
+Explicit `MCW_RATE_LIMIT_REDIS_REST_URL` and `MCW_RATE_LIMIT_REDIS_REST_TOKEN` values take precedence. The standard defaults are:
+
+```text
+60 weighted requests / 60 seconds / client
+600 weighted requests / 60 seconds / gateway
+```
+
+The `download-url` route costs two units because it can make two CurseForge requests. Other protected routes cost one. Client addresses are hashed before becoming Redis keys; raw addresses are not persisted by the rate limiter.
+
+Without Redis credentials, the gateway falls back to an in-memory limiter. That is useful locally but only protects one warm Vercel Function instance. Confirm production protection with:
+
+```text
+GET /api/health
+rateLimit.distributed == true
+```
+
+If a configured Redis store is unavailable, protected routes fail closed with `503 rate_limit_unavailable` instead of exposing the CurseForge quota. A rejected request returns `429`, `Retry-After`, `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset`.
+
+An optional Vercel Firewall rule can provide an outer layer before Functions execute:
 
 ```text
 If Request Path starts with /api/curseforge/
@@ -86,6 +118,8 @@ Then Rate Limit: 60 requests per 60 seconds per IP
 - Do not add a generic `?url=` proxy endpoint.
 - Do not stream `.jar`, `.zip`, or `.mcwpack` files through the Function.
 - The optional `MCW_CLIENT_TOKEN` is not a strong secret in a desktop app; rely on server validation and Vercel Firewall for real abuse protection.
+- Keep the Upstash write token server-side and never include it in the launcher.
+- Do not disable the code-level rate limit in production.
 - If CurseForge returns no download URL, MCW Launcher must use its manual-download fallback.
 
 ## Loader values

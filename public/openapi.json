@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "MCW CurseForge Gateway",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "description": "Minecraft-only metadata gateway used by MCW Launcher. The CurseForge API key remains server-side."
   },
   "servers": [
@@ -23,14 +23,14 @@
           { "name": "index", "in": "query", "schema": { "type": "integer", "minimum": 0, "default": 0 } },
           { "name": "pageSize", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 50, "default": 20 } }
         ],
-        "responses": { "200": { "description": "CurseForge search response" }, "400": { "description": "Invalid parameters" } }
+        "responses": { "200": { "description": "CurseForge search response" }, "400": { "description": "Invalid parameters" }, "429": { "$ref": "#/components/responses/RateLimited" } }
       }
     },
     "/api/curseforge/mod": {
       "get": {
         "summary": "Get one project",
         "parameters": [{ "name": "modId", "in": "query", "required": true, "schema": { "type": "integer", "minimum": 1 } }],
-        "responses": { "200": { "description": "CurseForge mod response" } }
+        "responses": { "200": { "description": "CurseForge mod response" }, "429": { "$ref": "#/components/responses/RateLimited" } }
       }
     },
     "/api/curseforge/files": {
@@ -41,7 +41,7 @@
           { "name": "gameVersion", "in": "query", "schema": { "type": "string" } },
           { "name": "loader", "in": "query", "schema": { "type": "string", "enum": ["any", "forge", "fabric", "quilt", "neoforge"] } }
         ],
-        "responses": { "200": { "description": "CurseForge files response" } }
+        "responses": { "200": { "description": "CurseForge files response" }, "429": { "$ref": "#/components/responses/RateLimited" } }
       }
     },
     "/api/curseforge/file": {
@@ -51,7 +51,7 @@
           { "name": "modId", "in": "query", "required": true, "schema": { "type": "integer", "minimum": 1 } },
           { "name": "fileId", "in": "query", "required": true, "schema": { "type": "integer", "minimum": 1 } }
         ],
-        "responses": { "200": { "description": "CurseForge file response" } }
+        "responses": { "200": { "description": "CurseForge file response" }, "429": { "$ref": "#/components/responses/RateLimited" } }
       }
     },
     "/api/curseforge/download-url": {
@@ -61,7 +61,7 @@
           { "name": "modId", "in": "query", "required": true, "schema": { "type": "integer", "minimum": 1 } },
           { "name": "fileId", "in": "query", "required": true, "schema": { "type": "integer", "minimum": 1 } }
         ],
-        "responses": { "200": { "description": "String response containing the URL" }, "404": { "description": "URL unavailable" } }
+        "responses": { "200": { "description": "String response containing the URL" }, "409": { "description": "Manual download required" }, "429": { "$ref": "#/components/responses/RateLimited" } }
       }
     },
     "/api/curseforge/files/batch": {
@@ -71,7 +71,7 @@
           "required": true,
           "content": { "application/json": { "schema": { "type": "object", "required": ["fileIds"], "properties": { "fileIds": { "type": "array", "minItems": 1, "maxItems": 50, "items": { "type": "integer", "minimum": 1 } } } } } }
         },
-        "responses": { "200": { "description": "CurseForge batch file response" } }
+        "responses": { "200": { "description": "CurseForge batch file response" }, "429": { "$ref": "#/components/responses/RateLimited" } }
       }
     },
     "/api/curseforge/mods/batch": {
@@ -81,7 +81,20 @@
           "required": true,
           "content": { "application/json": { "schema": { "type": "object", "required": ["modIds"], "properties": { "modIds": { "type": "array", "minItems": 1, "maxItems": 50, "items": { "type": "integer", "minimum": 1 } } } } } }
         },
-        "responses": { "200": { "description": "CurseForge batch mod response" } }
+        "responses": { "200": { "description": "CurseForge batch mod response" }, "429": { "$ref": "#/components/responses/RateLimited" } }
+      }
+    }
+  },
+  "components": {
+    "responses": {
+      "RateLimited": {
+        "description": "The client or gateway request budget was exceeded.",
+        "headers": {
+          "Retry-After": { "schema": { "type": "integer", "minimum": 1 } },
+          "X-RateLimit-Limit": { "schema": { "type": "integer" } },
+          "X-RateLimit-Remaining": { "schema": { "type": "integer" } },
+          "X-RateLimit-Reset": { "schema": { "type": "integer" } }
+        }
       }
     }
   }

@@ -2,6 +2,7 @@ import { GATEWAY_NAME, GATEWAY_VERSION, MINECRAFT_GAME_ID } from "../lib/constan
 import { curseForgeRequest } from "../lib/curseforge.js";
 import { CurseForgeUpstreamError } from "../lib/errors.js";
 import { handleApiRequest, jsonResponse, OPTIONS } from "../lib/http.js";
+import { getRateLimitHealth } from "../lib/rate-limit.js";
 
 export { OPTIONS };
 
@@ -17,6 +18,7 @@ export async function GET(request) {
                 version: GATEWAY_VERSION,
                 curseforgeConfigured: false,
                 curseforgeCredentials: "missing",
+                rateLimit: getRateLimitHealth(),
                 timestamp: new Date().toISOString(),
             }, 503);
         }
@@ -28,6 +30,7 @@ export async function GET(request) {
                 version: GATEWAY_VERSION,
                 curseforgeConfigured: true,
                 curseforgeCredentials: "not_checked",
+                rateLimit: getRateLimitHealth(),
                 timestamp: new Date().toISOString(),
             }, 200);
         }
@@ -41,6 +44,7 @@ export async function GET(request) {
                 curseforgeConfigured: true,
                 curseforgeCredentials: "valid",
                 curseforgeReachable: true,
+                rateLimit: getRateLimitHealth(),
                 timestamp: new Date().toISOString(),
             }, 200);
         }
@@ -54,10 +58,11 @@ export async function GET(request) {
                     curseforgeConfigured: true,
                     curseforgeCredentials: rejected ? "rejected" : "unknown",
                     curseforgeReachable: rejected,
+                    rateLimit: getRateLimitHealth(),
                     timestamp: new Date().toISOString(),
                 }, 503);
             }
             throw error;
         }
-    });
+    }, { rateLimit: new URL(request.url).searchParams.get("probe") === "1" });
 }

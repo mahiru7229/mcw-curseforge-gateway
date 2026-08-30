@@ -53,5 +53,5 @@ export async function GET(request) {
             }
             throw error;
         }
-    }, { requireClientAuth: true });
+    }, { requireClientAuth: true, rateLimitCost: 2 });
 }
